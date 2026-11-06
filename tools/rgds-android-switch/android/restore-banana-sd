@@ -1,0 +1,53 @@
+#!/system/bin/sh
+
+LOG=/data/local/tmp/restore-banana-sd.log
+DEVICE=/dev/block/mmcblk0
+stamp() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >>"$LOG"; }
+valid_hash() { case "$1" in *[!0-9a-f]*|'') return 1 ;; esac; [ "${#1}" -eq 64 ]; }
+hash_sector() { dd if="$DEVICE" bs=512 skip="$1" count=1 2>/dev/null | sha256sum | awk '{print $1}'; }
+
+stamp "restore service started"
+attempt=0; backup=; config=
+while [ "$attempt" -lt 120 ]; do
+    if [ -b "$DEVICE" ] && [ "$(cat /sys/class/block/mmcblk0/device/type 2>/dev/null)" = SD ]; then
+        for candidate in /mnt/media_rw/*/rgds-sd-boot-area-16MiB.img; do
+            if [ -f "$candidate" ]; then
+                backup="$candidate"
+                config="$(dirname "$candidate")/rgds-android-switch.conf"
+                [ -f "$config" ] && break
+                backup=
+            fi
+        done
+        [ -n "$backup" ] && break
+    fi
+    attempt=$((attempt + 1)); sleep 1
+done
+[ -n "$backup" ] && [ -f "$config" ] || { stamp "backup/config not mounted; no write performed"; exit 1; }
+read_value() { sed -n "s/^$1=//p" "$config" | head -n 1; }
+EXPECTED_BACKUP_HASH="$(read_value EXPECTED_BACKUP_HASH)"
+EXPECTED_SELECTOR_HASH="$(read_value EXPECTED_SELECTOR_HASH)"
+EXPECTED_FIT_HASH="$(read_value EXPECTED_FIT_HASH)"
+EXPECTED_ZERO_SECTOR_HASH="$(read_value EXPECTED_ZERO_SECTOR_HASH)"
+for value in "$EXPECTED_BACKUP_HASH" "$EXPECTED_SELECTOR_HASH" "$EXPECTED_FIT_HASH" "$EXPECTED_ZERO_SECTOR_HASH"; do
+    valid_hash "$value" || { stamp "invalid hash configuration"; exit 1; }
+done
+[ "$(sha256sum "$backup" 2>/dev/null | awk '{print $1}')" = "$EXPECTED_BACKUP_HASH" ] || { stamp "backup hash mismatch"; exit 1; }
+
+restore_sector() {
+    sector="$1"; expected="$2"; label="$3"; temp="/data/local/tmp/banana-restore-$1.bin"
+    dd if="$backup" of="$temp" bs=512 skip="$sector" count=1 2>/dev/null || return 1
+    [ "$(sha256sum "$temp" | awk '{print $1}')" = "$expected" ] || { stamp "backup $label hash mismatch"; return 1; }
+    live="$(hash_sector "$sector")"
+    [ "$live" = "$expected" ] && { stamp "$label already active"; return 0; }
+    [ "$live" = "$EXPECTED_ZERO_SECTOR_HASH" ] || { stamp "unexpected $label contents; refusing write"; return 1; }
+    dd if="$temp" of="$DEVICE" bs=512 seek="$sector" count=1 conv=fsync 2>>"$LOG" || return 1
+    [ "$(hash_sector "$sector")" = "$expected" ] || { stamp "$label verification failed"; return 1; }
+    stamp "$label restored"
+}
+
+# FIT first and selector last: never advertise a partially restored SD boot chain.
+result=0
+restore_sector 16384 "$EXPECTED_FIT_HASH" "BananaOS FIT" || result=1
+restore_sector 64 "$EXPECTED_SELECTOR_HASH" "BananaOS selector" || result=1
+sync
+exit "$result"
