@@ -64,7 +64,6 @@ jobs:
 
   image:
     if: always() && ((github.event_name == 'workflow_dispatch' && inputs.image) || (github.event_name == 'push' && github.ref == 'refs/heads/codex/rgds-android-0.5.2.2'))
-    needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
