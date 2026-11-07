@@ -12,7 +12,7 @@ The current stock image was inspected read-only over SSH: eMMC `boot` is Android
 
 Build the `rgds` image from this branch with `make rgds`. Before replacing the SD bootloader, keep a computer copy of the original 16 MiB SD boot-area backup. The preparation artifact is `outputs/rgds-android-switch/sd-first-16MiB-20261107.img` (SHA-256 `feb2fc8418093a42163cd3c8c3c46630816e2c1d7f4dc0669e607a65c15fc2ce`).
 
-Do not write the generated image's first 16 MiB over an existing, expanded card: that area includes its primary GPT, whose backup header is at the card's physical end. Install only the built `u-boot-rockchip.bin` at LBA 64 and copy `rgds-android.env` into the SD's FAT boot partition. The CI build uploads both files as `rgds-android-boot-files`. Keep the existing FIT at LBA 16384 and the current partition table intact. The first 16 MiB backup is for recovery, not the update payload.
+Do not write the generated image's first 16 MiB over an existing, expanded card: that area includes its primary GPT, whose backup header is at the card's physical end. Write only the built `u-boot-rockchip.bin` at LBA 64 and copy `rgds-android.env` into the SD's FAT boot partition. The binary is a combined RK3568 boot bundle; its FIT is embedded at offset `0x7f8000`, which maps to LBA 16384 when the file starts at LBA 64, replacing the old FIT as part of the same update. In the verified RG DS build the bundle is 9,590,272 bytes and ends before the first partition at LBA 32768. The CI build uploads both files as `rgds-android-boot-files`. The first 16 MiB backup is for recovery, not the update payload.
 
 After that, copy this directory to the handheld and run:
 
@@ -24,5 +24,5 @@ The tile is added to BananaOS's Apps shelf. The Android marker is consumed befor
 
 ## Limits
 
-This has not yet been tested by booting Android on the handheld. The build configuration and commands must compile and be reviewed before installing the rebuilt U-Boot. Keep the original boot-area backup. No sectors on the handheld have been changed by this preparation.
+The SD bootloader and BananaOS menu tile have been installed and verified on one RG DS; BananaOS still boots after an Android start attempt, but Android itself has not started yet. Further boot-stage diagnosis is needed. The procedure writes only to the SD card, not Android's eMMC partitions. Keep the original boot-area backup.
 
