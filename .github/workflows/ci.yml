@@ -69,7 +69,7 @@ jobs:
     timeout-minutes: 360
     strategy:
       matrix:
-      board: ${{ github.ref == 'refs/heads/codex/rgds-android-switch' && github.event_name == 'push' && fromJSON('["rgds"]') || fromJSON('["rgds","rgds-plus"]') }}
+        board: ${{ github.ref == 'refs/heads/codex/rgds-android-switch' && github.event_name == 'push' && fromJSON('["rgds"]') || fromJSON('["rgds","rgds-plus"]') }}
     env:
       BR2_DL_DIR: ${{ github.workspace }}/dl
     steps:
@@ -134,7 +134,7 @@ jobs:
     timeout-minutes: 45
     strategy:
       matrix:
-      board: ${{ github.ref == 'refs/heads/codex/rgds-android-switch' && github.event_name == 'push' && fromJSON('["rgds"]') || fromJSON('["rgds","rgds-plus"]') }}
+        board: ${{ github.ref == 'refs/heads/codex/rgds-android-switch' && github.event_name == 'push' && fromJSON('["rgds"]') || fromJSON('["rgds","rgds-plus"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -155,3 +155,4 @@ jobs:
           path: |
             qemu-out/*.png
             qemu-out/*.log
+
