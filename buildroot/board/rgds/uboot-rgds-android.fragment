@@ -4,6 +4,8 @@ CONFIG_CMD_ABOOTIMG=y
 CONFIG_CMD_ADTIMG=y
 CONFIG_CMD_FDT=y
 CONFIG_CMD_IMPORTENV=y
+CONFIG_CMD_FAT=y
+CONFIG_FAT_WRITE=y
 CONFIG_OF_LIBFDT_OVERLAY=y
 
 # Consume a one-use request before the default bootflow. Only RG DS builds use this.
