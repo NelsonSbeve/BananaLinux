@@ -1,80 +1,158 @@
-# RG DS BananaOS ↔ Android switch
+# RG DS: switch between BananaOS and stock Android
 
-This experimental add-on adds a **Switch to Android** tile to BananaOS and boots
-the stock Android system on the internal eMMC without removing the SD card.
-Android restores BananaOS's SD boot sectors during startup, so restarting
-Android normally returns to BananaOS.
+This experimental add-on adds a **Switch to Android** tile to BananaOS. It
+boots the stock Android installation on the RG DS's internal eMMC while the
+BananaOS SD card stays inserted. Android restores the SD boot headers, so a
+normal Android restart returns to BananaOS.
 
-It is for the **Anbernic RG DS only**, with stock internal Android and a
-BananaOS card using the layout in this repository. It has not been tested on
-hardware. Do not install it on the RG DS Plus or another image. A wrong boot
-sector can leave the card unable to boot; keep a second copy of the generated
-16 MiB backup on a computer before enabling the Android restorer.
+## Tested status
 
-The design adapts the reversible RG DS boot-sector switch by thegraxisreal:
-[rgds-rocknix-android-switch](https://github.com/thegraxisreal/rgds-rocknix-android-switch).
-The BananaOS-specific layout checks and integration are in this directory.
+Tested end-to-end on one Anbernic RG DS running BananaOS 0.5.2.2 from the SD
+card and its stock Android installation from eMMC (7 November 2026). The
+switch booted Android and returned to BananaOS. This is community software,
+not an official BananaOS feature. It has not been tested on the RG DS Plus or
+other storage layouts.
 
-## Why the ROCKNIX switch cannot be installed unchanged
+## Requirements
 
-BananaOS identifies the SD card dynamically and mounts its first FAT partition
-at `/boot`. Its image reserves the first 16 MiB for Rockchip boot data; the
-first partition starts at LBA 32768. The add-on checks those facts, checks
-`RKNS` at LBA 64 and a FIT header at LBA 16384, and hashes the exact sectors
-from your card before it will offer to switch. It does not assume the ROCKNIX
-device name or write sectors based only on the model name.
+- An **Anbernic RG DS** (not RG DS Plus) with the stock Android installation
+  still present on eMMC.
+- BananaOS on the SD card, using the RG DS layout in this repository: the FAT
+  boot partition starts at LBA 32768 and the SD boot markers are `RKNS` at
+  LBA 64 and a FIT header at LBA 16384.
+- Root SSH access in BananaOS and a computer with SSH/SCP.
+- Android USB debugging and **root ADB**. `adb root` must work and
+  `adb shell id` must report `uid=0(root)`. USB debugging alone is not enough.
+- A computer backup of the SD boot area. The installer checks and creates a
+  card-specific backup before it enables the switch.
+
+If `adb root` is refused, stop. This method depends on root ADB to install the
+Android restore service; it does not unlock or root Android for you.
+
+## How it works
+
+The BananaOS tile checks the model, SD layout, backup, and saved hashes. When
+selected, it temporarily zeros two 512-byte sectors on the SD: LBA 64 and LBA
+16384. The Rockchip boot ROM then falls through to the RG DS's original eMMC
+boot chain and Android starts normally. The SD's filesystems and Android's
+bootloader are not written by the switch.
+
+An init service installed in Android's `/vendor` restores the two saved SD
+sectors from the verified backup. It restores the FIT sector first and the
+RKNS selector last. The BananaOS tile refuses to switch until this Android
+service has been installed and verified.
+
+The reversible boot-sector design adapts
+[thegraxisreal's RG DS ROCKNIX ↔ Android switch](https://github.com/thegraxisreal/rgds-rocknix-android-switch)
+to BananaOS's SD layout and Apps menu.
 
 ## Install
 
-1. Put your SSH public key in `banana/ssh/authorized_keys` on the SD data
-   partition, enable SSH in Settings → Network, then connect as `root` (BananaOS
-   SSH uses keys and does not provide password login).
-2. Copy this directory to `/data/banana/rgds-android-switch` with `scp -r`,
-   then run `bash /data/banana/rgds-android-switch/install-banana.sh` over SSH.
-   It makes a 16 MiB boot-area backup on the FAT boot partition and installs a
-   guarded tile under BananaOS's Apps shelf.
-3. Copy `/boot/rgds-sd-boot-area-16MiB.img` to a computer and keep it safe.
-4. Shut down BananaOS, start Android once with the SD card inserted, and
-   connect the device to a computer with ADB. USB debugging and `adb root`
-   must work. On Windows, run `install-android.ps1` from this directory.
-   The script installs Android's restore service, marks the switch ready, and
-   immediately verifies that the sectors are intact.
-5. Restart Android. It should boot back to BananaOS.
+Use a working copy of this repository's `codex/rgds-android-switch` branch.
+The steps below show Windows PowerShell; replace `<IP>` with the handheld's
+BananaOS address and use the SSH key that is authorized on the device.
 
-The Apps shelf tile appears after step 2 but refuses to alter boot sectors
-until step 4 has created the ready marker. To switch, launch it, let BananaOS
-power off, wait about ten seconds, then press Power again with the SD card
-still inserted. The first start after power-off is a separate press because
-the internal boot chain is selected only after the SD headers are blanked.
+### 1. Install the BananaOS side
+
+With BananaOS running and SSH enabled, copy this add-on directory to the
+handheld. Open PowerShell in the repository root:
+
+```powershell
+scp -O -r .\tools\rgds-android-switch root@<IP>:/data/banana/
+ssh root@<IP> 'bash /data/banana/rgds-android-switch/install-banana.sh'
+```
+
+`-O` selects legacy SCP, which works with BananaOS's SSH server. The installer
+checks the RG DS model, SD device type, partition start, and both boot markers.
+It saves a 16 MiB backup at `/boot/rgds-sd-boot-area-16MiB.img`, writes its
+hash configuration, installs the **Switch to Android** tile, and returns
+`/boot` to read-only. It does not change either boot sector.
+
+Copy the backup to the computer and keep it safe:
+
+```powershell
+scp -O root@<IP>:/boot/rgds-sd-boot-area-16MiB.img .\rgds-sd-boot-area-16MiB.img
+```
+
+Do not continue if the installer reports a model, layout, marker, or hash
+mismatch. Do not use a backup from another SD card.
+
+### 2. Prepare Android and install its restore service
+
+For this one-time setup, boot Android by its normal route: shut down BananaOS,
+remove the SD card, and power on. After Android has fully loaded, insert the SD
+card and connect the console to the computer by USB. Enable Developer options
+and USB debugging, then accept the computer's RSA authorization prompt.
+
+In PowerShell, check the connection and root access:
+
+```powershell
+adb devices
+adb root
+adb shell id
+```
+
+Continue only if the device is listed as `device`, `adb root` succeeds, and
+the shell reports `uid=0(root)`. From the repository directory, run:
+
+```powershell
+.\tools\rgds-android-switch\install-android.ps1
+```
+
+The script checks the RG DS model and root access, remounts Android partitions
+for the install, copies the restore service to `/vendor/bin/` and its init
+configuration to `/vendor/etc/init/`, creates the ready marker on the SD, then
+runs the service once. The final log should say that the FIT and selector are
+already active. This step **does modify Android's `/vendor` partition**.
+
+Restart Android with the SD inserted. With the boot headers still active, the
+console should return to BananaOS. The Switch to Android tile is now enabled.
+
+### 3. Use the switch
+
+In BananaOS, open **Apps → Switch to Android**. Do not use any separate
+experimental direct-boot tile. The console powers off after checking the SD.
+Wait about ten seconds, then press Power once with the SD still inserted.
+Android should start and restore the SD headers automatically. Restart Android
+normally to boot BananaOS again.
 
 ## Recovery
 
-If Android does not restore BananaOS boot, boot Android, insert the SD after
-Android is ready, and use root ADB. Restore the FIT sector first and the
-selector sector last from the backup on the mounted SD partition:
+If Android starts but does not restore the SD headers, leave the SD inserted,
+connect root ADB, and run the guarded restore service manually:
 
-```sh
+```powershell
 adb root
-adb shell
-backup=$(find /mnt/media_rw -maxdepth 3 -name rgds-sd-boot-area-16MiB.img | head -n 1)
-dd if="$backup" of=/dev/block/mmcblk0 bs=512 skip=16384 seek=16384 count=1 conv=fsync
-dd if="$backup" of=/dev/block/mmcblk0 bs=512 skip=64 seek=64 count=1 conv=fsync
-sync
+adb shell '/system/bin/sh /vendor/bin/restore-banana-sd; cat /data/local/tmp/restore-banana-sd.log'
 ```
 
-If the sectors do not match the generated backup, stop and do not write guessed
-values. The backup is specific to that SD card and BananaOS image.
+The service verifies the saved backup and hashes, and only writes a header if
+that sector is all zero. If it reports an unexpected sector value, a missing
+backup, or a hash mismatch, stop. Do not guess a block device or run `dd` with
+values from another card. The backup is card-specific.
 
-## What it changes
+## Updates and reinstalling
 
-- SD card: creates `/rgds-sd-boot-area-16MiB.img`, its hash configuration and
-  a readiness marker on the FAT boot partition; installs the app script under
-  `/data/store/tiles/`.
-- Android: installs `/vendor/bin/restore-banana-sd` and
+Normal in-place BananaOS updates through **Settings → System → Updates** use
+the other system slot and update the kernel/device tree under `/boot`; they
+preserve the data partition. The add-on's tile and boot files are outside the
+slot update, so this switch should remain available after a normal update.
+The Android restore service is separate from BananaOS updates. See the
+[BananaOS update documentation](https://github.com/JorreFog/BananaLinux/blob/main/docs/FIRST-BOOT.md#updating-later).
+
+Reflashing a complete SD image, replacing the SD card, or restoring a whole
+card image can remove the tile/configuration and replace the SD boot headers.
+After that, reinstall the BananaOS side and Android restorer using a fresh,
+matching backup. Do not apply an old card's backup to a new card.
+
+## Files installed
+
+- SD `/boot`: `rgds-sd-boot-area-16MiB.img`, `rgds-android-switch.conf`, and
+  `rgds-android-switch-ready`.
+- BananaOS data: `/data/store/tiles/Switch to Android.sh` and its log at
+  `/data/banana/logs/rgds-android-switch.log`.
+- Android `/vendor`: `/vendor/bin/restore-banana-sd` and
   `/vendor/etc/init/restore-banana-sd.rc`.
-- Switching blanks only LBA 64 and LBA 16384, after checking both sectors
-  against the backup; Android restores FIT first and selector last.
 
-The add-on does not modify the internal bootloader, Android partitions, or
-BananaOS system image. Android root ADB is required; without it this switching
-method cannot be completed.
+The add-on does not change the BananaOS root filesystem or the internal
+Android bootloader. Keep the SD backup on a computer before using it.

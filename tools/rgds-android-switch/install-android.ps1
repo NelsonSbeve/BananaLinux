@@ -11,7 +11,7 @@ Invoke-Adb wait-for-device
 Invoke-Adb root
 Invoke-Adb wait-for-device
 $Model = (& $Adb shell 'tr -d "\000" </proc/device-tree/model' 2>$null | Out-String).Trim()
-if ($LASTEXITCODE -ne 0 -or $Model -ne "Anbernic RG DS") { throw "Unsupported Android device: $Model" }
+if ($LASTEXITCODE -ne 0 -or ($Model -ne "Anbernic RG DS" -and $Model -ne "Anbernic RG DS (rk3568)")) { throw "Unsupported Android device: $Model" }
 $Uid = (& $Adb shell 'id -u' | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $Uid -ne "0") { throw "adb root did not provide a root shell" }
 Invoke-Adb remount
