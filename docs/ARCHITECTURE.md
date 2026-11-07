@@ -4,7 +4,7 @@
 
 | Where | What | Size |
 |---|---|---|
-| sector 64 (32 KiB) | U-Boot for the RK3568 (`u-boot-rockchip.bin`: Rockchip's DRAM init, U-Boot SPL, TF-A BL31, U-Boot) | ~1.5 MB |
+| from sector 64 (32 KiB) | RK3568 boot bundle (`u-boot-rockchip.bin`: DRAM init, SPL, TF-A BL31, U-Boot and embedded FIT; the FIT begins at LBA 16384) | 9,590,272 bytes for the RG DS Android-switch build (varies by build) |
 | partition 1, `BANANA-BOOT` (FAT) | `a/Image` and `a/<handheld>.dtb` (and `b/` after an update), `extlinux/extlinux.conf` with a label per slot and `DEFAULT` naming the one to boot | 64 MB |
 | partition 2, `banana-root-a` (squashfs, LZ4) | the system, read-only | 256 MB (tens used) |
 | partition 3, `banana-root-b` | the other slot: empty until the first update writes the new system there | 256 MB |
