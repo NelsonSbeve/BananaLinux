@@ -1,0 +1,12 @@
+# Commands needed to boot the stock Android image from eMMC and merge its DTBO.
+CONFIG_ANDROID_BOOT_IMAGE=y
+CONFIG_CMD_ABOOTIMG=y
+CONFIG_CMD_ADTIMG=y
+CONFIG_CMD_FDT=y
+CONFIG_CMD_IMPORTENV=y
+CONFIG_OF_LIBFDT_OVERLAY=y
+
+# Consume a one-use request before the default bootflow. Only RG DS builds use this.
+CONFIG_USE_PREBOOT=y
+CONFIG_PREBOOT="if mmc dev 1; then if fatload mmc 1:1 ${loadaddr} rgds-android.once; then if fatrm mmc 1:1 rgds-android.once; then if fatload mmc 1:1 ${loadaddr} rgds-android.env; then if env import -t ${loadaddr} ${filesize}; then run rgds_android_boot; fi; fi; fi; fi; fi"
+

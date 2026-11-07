@@ -63,13 +63,13 @@ jobs:
           done
 
   image:
-    if: github.event_name == 'workflow_dispatch' && inputs.image
+    if: always() && ((github.event_name == 'workflow_dispatch' && inputs.image) || (github.event_name == 'push' && github.ref == 'refs/heads/codex/rgds-android-0.5.2.2'))
     needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
       matrix:
-        board: [rgds, rgds-plus]
+        board: ${{ github.ref == 'refs/heads/codex/rgds-android-0.5.2.2' && github.event_name == 'push' && fromJSON('["rgds"]') || fromJSON('["rgds","rgds-plus"]') }}
     env:
       BR2_DL_DIR: ${{ github.workspace }}/dl
     steps:
@@ -116,18 +116,25 @@ jobs:
           path: |
             output/${{ matrix.board }}/images/banana-${{ matrix.board }}.img.gz
             output/${{ matrix.board }}/images/banana-${{ matrix.board }}-*.update.tar
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'rgds'
+        with:
+          name: rgds-android-boot-files
+          path: |
+            output/rgds/images/u-boot-rockchip.bin
+            output/rgds/images/rgds-android.env
 
   # the whole image booted in QEMU: the first boot makes the data partition, the menu comes up on both panels, a
   # game is started from the library and the menu comes back, a shutdown from the settings powers the VM off; the
   # screenshots and the card's logs are kept as an artifact
   boot:
-    if: github.event_name == 'workflow_dispatch' && inputs.image
+    if: (github.event_name == 'workflow_dispatch' && inputs.image) || (github.event_name == 'push' && github.ref == 'refs/heads/codex/rgds-android-0.5.2.2')
     needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       matrix:
-        board: [rgds, rgds-plus]
+        board: ${{ github.ref == 'refs/heads/codex/rgds-android-0.5.2.2' && github.event_name == 'push' && fromJSON('["rgds"]') || fromJSON('["rgds","rgds-plus"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

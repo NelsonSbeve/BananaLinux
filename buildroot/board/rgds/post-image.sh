@@ -24,8 +24,13 @@ if [ $BOARD = universal ]; then
 else
     sed "s/@DTB@/$DTBS/g" "$HERE/extlinux.conf.in" > extlinux.conf
 fi
+ANDROID_FILE=
+if [ "$BOARD" = rgds ]; then
+    cp "$HERE/rgds-android.env" "$BINARIES_DIR/rgds-android.env"
+    ANDROID_FILE='file rgds-android.env { image = "rgds-android.env" }'
+fi
 FILES=; for d in $DTBS; do FILES="$FILES\t\tfile a/$d.dtb { image = \"$d.dtb\" }\n"; done
-sed -e "s|^.*@DTBFILES@.*$|$FILES|" -e "s/@BOARD@/$BOARD/g" "$HERE/genimage.cfg.in" > genimage.cfg
+sed -e "s|^.*@DTBFILES@.*$|$FILES|" -e "s|@ANDROID_FILE@|$ANDROID_FILE|" -e "s/@BOARD@/$BOARD/g" "$HERE/genimage.cfg.in" > genimage.cfg
 rm -rf "$BUILD_DIR/genimage.tmp"
 genimage --rootpath "$TARGET_DIR" --tmppath "$BUILD_DIR/genimage.tmp" --inputpath "$BINARIES_DIR" \
     --outputpath "$BINARIES_DIR" --config genimage.cfg

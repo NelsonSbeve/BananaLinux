@@ -7,6 +7,7 @@ image boot.vfat {
 		label = "BANANA-BOOT"
 		file a/Image { image = "Image.lz4" }
 @DTBFILES@
+		@ANDROID_FILE@
 		file extlinux/extlinux.conf { image = "extlinux.conf" }
 	}
 	size = 64M
